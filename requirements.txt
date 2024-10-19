@@ -5,3 +5,4 @@ setuptools-rust
 pyaudio 
 speechrecognition
 sqlalchemy
+onnxruntime

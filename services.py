@@ -31,12 +31,13 @@ class FaceRecognitionService():
 
     def generate_embedding(self, img: np.array):
         bboxes, kpss = self.det_model.detect(img, max_num=0, metric="default")
-
+        embeddings = []
         if len(bboxes) == 0:
             return None, "No faces detected"
+        for box, kps in zip(bboxes, kpss):
+            face = Face(bbox=box, kps=kps, det_score=box[4])
+            self.rec_model.get(img, face)
+            face_embedding = face.normed_embedding
+            embeddings.append(face_embedding)
 
-        face = Face(bbox=bboxes[0], kps=kpss[0], det_score=bboxes[0][4])
-        self.rec_model.get(img, face)
-        face_embedding = face.normed_embedding
-
-        return face_embedding, None, bboxes
+        return embeddings, None, bboxes

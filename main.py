@@ -3,15 +3,18 @@ import threading
 from services import FaceRecognitionService, VoiceToText
 import numpy as np
 import speech_recognition as sr
-from db import Session, EmbeddingModel
+from db import engine, EmbeddingModel
+from sqlalchemy.orm import sessionmaker
 
+session = sessionmaker(bind=engine)
+Session = session()
 # Initialize face recognition and voice-to-text services
 face_recognition_service = FaceRecognitionService()
-voice_to_text_service = VoiceToText("turbo")
+# voice_to_text_service = VoiceToText("turbo")
 
 # Global variable to store recognized speech
 text_input = ""
-cap = cv2.VideoCapture(0)
+cap = cv2.VideoCapture("./teste.mp4")
 cv2.namedWindow("Webcam", cv2.WINDOW_NORMAL)
 
 
@@ -98,9 +101,9 @@ def get_medium_bbox(bboxes: np.array) -> np.array:
 
 
 # Plausible positions based on the x-coordinate
-plausable_positions = {"esquerda": lambda x: x[np.argmin(x[:, 0])],
+plausable_positions = {"esquerda": lambda x: np.argmin(x[:, 0]),
                        "meio": get_medium_bbox,
-                       "direita": lambda x: x[np.argmax(x[:, 0])]}
+                       "direita": lambda x: np.argmax(x[:, 0])}
 
 recognized_names = {}
 
@@ -118,7 +121,7 @@ while True:
 
     # Handle the speech input (e.g., "Esse é o Paulo, na esquerda")
     if "Esse é o" in text_input or "Essa é a" in text_input:
-        name = text_input.split()[-1]
+        name = text_input.split()[-3]
         if len(bboxes) > 1:
             position = ""
             for plausable_position in plausable_positions:
@@ -128,14 +131,11 @@ while True:
                 # Get the selected bounding box based on the spoken position
                 selected_bbox = plausable_positions[position](bboxes)
                 if selected_bbox is not None:
-                    # Extract the embedding for the selected bounding box
-                    bbox_index = list(bboxes).index(selected_bbox)
                     new_embedding = EmbeddingModel(
-                        name=name, embedding=embedding_to_text(embeddings[bbox_index]))
-                    print(f"Created new embedding for: {name}")
+                        name=name, embedding=embedding_to_text(embeddings[selected_bbox]))
                     Session.add(new_embedding)
                     Session.commit()
-                    recognized_names[bbox_index] = name
+                    recognized_names[selected_bbox] = name
         else:
             new_embedding = EmbeddingModel(
                 name=name, embedding=embedding_to_text(embeddings[0]))
@@ -148,7 +148,7 @@ while True:
     for i, emb in enumerate(embeddings):
         for db_name, db_emb in treated_retrieved_embeddings.items():
             similarity = calculate_cosine_similarity(emb, db_emb)
-            if similarity > 0.35:  # Assume threshold for a match
+            if similarity > 0.95:  # Assume threshold for a match
                 recognized_names[i] = db_name
 
     # Draw bounding boxes and names on the frame
@@ -160,6 +160,8 @@ while True:
     # Check for 'q' key to quit the program
     if cv2.waitKey(1) & 0xFF == ord('q'):
         break
+
+    text_input = ""
 
 # Clean up resources
 cap.release()
