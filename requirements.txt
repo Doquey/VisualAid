@@ -1,2 +1,7 @@
 insightface
 opencv-python
+openai-whisper
+setuptools-rust
+pyaudio 
+speechrecognition
+sqlalchemy
